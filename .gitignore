@@ -136,6 +136,7 @@ dist/
 
 # Personal setup notes (Jenkins/SonarCloud/Docker Hub steps) - not part of the graded deliverable
 info.md
+rapport.md
 
 # CI-generated artifacts (produced by the Jenkins pipeline, not source)
 sbom-spdx.json
