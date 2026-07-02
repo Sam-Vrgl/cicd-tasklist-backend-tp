@@ -1,9 +1,6 @@
 pipeline {
   agent any
 
-  tools {
-    nodejs 'nodejs' // must match the Name field you set in Manage Jenkins → Tools
-  }
 
   environment {
     DOCKERHUB_CREDENTIALS = credentials('samuelv-dockerhub-credentials')
