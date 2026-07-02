@@ -75,6 +75,7 @@ web_modules/
 .yarn-integrity
 
 # dotenv environment variable files
+.env
 .env.development.local
 .env.test.local
 .env.production.local
@@ -132,3 +133,11 @@ dist
 dist/
 
 .scannerwork/
+
+# Personal setup notes (Jenkins/SonarCloud/Docker Hub steps) - not part of the graded deliverable
+info.md
+
+# CI-generated artifacts (produced by the Jenkins pipeline, not source)
+sbom-spdx.json
+trivy-report.txt
+npm-audit-report.json
