@@ -2,13 +2,13 @@ pipeline {
   agent any
 
   tools {
-    nodejs 'Node22'
+    nodejs 'nodejs' // must match the Name field you set in Manage Jenkins → Tools
   }
 
   environment {
-    DOCKERHUB_REPO = 'CHANGE_ME_DOCKERHUB_USERNAME/tasklist-backend'
-    IMAGE_TAG      = "${DOCKERHUB_REPO}:${BUILD_NUMBER}"
-    IMAGE_LATEST   = "${DOCKERHUB_REPO}:latest"
+    DOCKERHUB_CREDENTIALS = credentials('samuelv-dockerhub-credentials')
+    IMAGE_NAME = 'samvrgl/cicd-tasklist-backend'
+    IMAGE_TAG  = "${env.BUILD_NUMBER}"
   }
 
   options {
@@ -44,7 +44,6 @@ pipeline {
         always {
           junit 'reports/junit.xml'
           archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
-          recordCoverage(tools: [[parser: 'LCOV', pattern: 'coverage/lcov.info']])
         }
       }
     }
@@ -72,13 +71,10 @@ pipeline {
       }
     }
 
-    stage('SonarCloud Analysis') {
+    stage('SonarQube Analysis') {
       steps {
-        withSonarQubeEnv('SonarCloud') {
-          script {
-            def scannerHome = tool 'SonarScannerCLI'
-            sh "${scannerHome}/bin/sonar-scanner"
-          }
+        withSonarQubeEnv(installationName: 'sonarqube-server-2', credentialsId: 'samuelv-sonarqube-credentials') {
+          sh 'npx sonar-scanner'
         }
       }
     }
@@ -93,51 +89,39 @@ pipeline {
 
     stage('Docker Build') {
       steps {
-        sh "docker build -t ${IMAGE_TAG} -t ${IMAGE_LATEST} ."
+        sh "docker build --provenance=false --sbom=false -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest ."
       }
     }
 
-    stage('Trivy Image Scan') {
+    stage('Trivy Scan') {
       steps {
-        sh "trivy image --exit-code 0 --severity HIGH,CRITICAL --format table -o trivy-report.txt ${IMAGE_TAG}"
-      }
-      post {
-        always {
-          archiveArtifacts artifacts: 'trivy-report.txt', allowEmptyArchive: true
-        }
+        sh "trivy image --cache-dir ${WORKSPACE}/.trivycache --exit-code 0 --severity HIGH,CRITICAL --format table ${IMAGE_NAME}:${IMAGE_TAG}"
       }
     }
 
-    stage('Generate SBOM (SPDX)') {
+    stage('SBOM Generation') {
       steps {
-        sh "syft ${IMAGE_TAG} -o spdx-json=sbom-spdx.json"
+        sh "trivy image --cache-dir ${WORKSPACE}/.trivycache --format spdx-json --output sbom-spdx.json ${IMAGE_NAME}:${IMAGE_TAG}"
       }
       post {
         always {
-          archiveArtifacts artifacts: 'sbom-spdx.json', allowEmptyArchive: true
+          archiveArtifacts artifacts: 'sbom-spdx.json', fingerprint: true
         }
       }
     }
 
     stage('Docker Push') {
       steps {
-        withCredentials([usernamePassword(
-          credentialsId: 'dockerhub-credentials',
-          usernameVariable: 'DOCKERHUB_USER',
-          passwordVariable: 'DOCKERHUB_PASS'
-        )]) {
-          sh 'echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin'
-          sh "docker push ${IMAGE_TAG}"
-          sh "docker push ${IMAGE_LATEST}"
-          sh 'docker logout'
-        }
+        sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+        sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+        sh "docker push ${IMAGE_NAME}:latest"
       }
     }
   }
 
   post {
     always {
-      cleanWs(patterns: [[pattern: 'node_modules/**', type: 'EXCLUDE']])
+      sh 'docker logout || true'
     }
   }
 }
