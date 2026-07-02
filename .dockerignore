@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+reports
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+Dockerfile
+.dockerignore
+src/__tests__
+prisma/test.db
+prisma/schema-test.prisma
+.vscode
+npm-debug.log*
